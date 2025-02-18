@@ -5,8 +5,18 @@ import YouTubePlayerKit
 struct SoundBoardView: View {
   @Environment(\.modelContext) var modelContext
   @State var isCreateTrackSheetPresented: Bool = false
+  @State var editTrack: Track? = nil
   @Query(sort: [SortDescriptor(\Track.createdAt, order: .reverse)]) var tracks: [Track]
   @State var track: Track? = nil
+  //  @State var track: Track? = Track(
+  //    id: "HsmI_WrAxs8",
+  //    startTime: Optional(2.0),
+  //    endTime: Optional(7.0),
+  //    thumbnailURL: URL(string: "https://img.youtube.com/vi/HsmI_WrAxs8/sddefault.jpg")!,
+  //    title: "Lelolelolelo"
+  //  )
+  @State var player: YouTubePlayer? = nil
+  @State var playDate = Date()
 
   let columns = [
     GridItem(.flexible(), spacing: 5, alignment: .center),
@@ -44,6 +54,7 @@ struct SoundBoardView: View {
                 Button {
                   withAnimation {
                     self.track = track
+                    self.playDate = Date()
                   }
                 } label: {
                   ZStack {
@@ -92,6 +103,21 @@ struct SoundBoardView: View {
                   }
                   .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+                .contextMenu {
+                  Button {
+                    editTrack = track
+                  } label: {
+                    Label("Edit", systemImage: "pencil")
+                  }
+
+                  Divider()
+
+                  Button(role: .destructive) {
+                    modelContext.delete(track)
+                  } label: {
+                    Label("Delete", systemImage: "trash")
+                  }
+                }
               }
             }
             .animation(.default, value: tracks)
@@ -100,73 +126,13 @@ struct SoundBoardView: View {
         }
 
         if let track {
-          VStack {
-            Spacer()
-            ZStack {
-              Color(.systemBackground)
-                .ignoresSafeArea()
-
-              VStack(spacing: 0) {
-                Divider()
-
-                HStack(spacing: 10) {
-                  ZStack {
-                    ProgressView()
-
-                    YouTubePlayerView(
-                      YouTubePlayer(
-                        source: .video(id: track.id),
-                        parameters: YouTubePlayer.Parameters(
-                          autoPlay: true,
-                          startTime: track.startTime.map { Measurement(value: $0, unit: .seconds) },
-                          endTime: track.endTime.map { Measurement(value: $0, unit: .seconds) }
-                        )
-                      )
-                    ) { state in
-                      switch state {
-                      case .idle, .ready:
-                        // EmptyView()
-                        Color.white
-                          .opacity(0.01)
-                      case .error(let error):
-                        ContentUnavailableView(
-                          "Error",
-                          systemImage: "exclamationmark.triangle.fill",
-                          description: Text("YouTube player couldn't be loaded: \(error)")
-                        )
-                      }
-                    }
-                    .aspectRatio(16 / 9, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .id(track.id)
-                  }
-
-                  Text("\(track.title)")
-                    .font(.body.bold())
-                    .fontDesign(.rounded)
-
-                  Spacer()
-
-                  HStack {
-                    Button {
-                      withAnimation {
-                        self.track = nil
-                      }
-                    } label: {
-                      Image(systemName: "xmark")
-                        .font(.body.bold())
-                    }
-                  }
-                  .padding(.vertical)
-                  .padding(.leading, 10)
-                  .padding(.trailing, 20)
-                }
-                .padding(10)
+          MiniPlayer(track: track, playDate: playDate)
+            .onClose {
+              withAnimation {
+                self.track = nil
               }
             }
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: 100)
-          }
-          .transition(.move(edge: .bottom).combined(with: .opacity))
+            .transition(.move(edge: .bottom).combined(with: .opacity).animation(.bouncy))
         }
       }
       .toolbar {
@@ -178,7 +144,7 @@ struct SoundBoardView: View {
           }
         }
       }
-      .sheet(isPresented: $isCreateTrackSheetPresented) {
+      .fullScreenCover(isPresented: $isCreateTrackSheetPresented) {
         TrackFormView()
           .onCancel {
             isCreateTrackSheetPresented = false
@@ -189,6 +155,27 @@ struct SoundBoardView: View {
             modelContext.insert(track)
           }
       }
+      .fullScreenCover(item: $editTrack) { track in
+        TrackFormView(
+          youtubeURLString: track.url.absoluteString,
+          title: track.title,
+          playEndsInSecond: track.endTime.map { Int($0 - (track.startTime ?? 0.0)) },
+          videoInfo: YouTubeVideoInfo(id: track.id, startTime: track.startTime)
+        )
+        .onCancel {
+          editTrack = nil
+        }
+        .onSave { updatedTrack in
+          editTrack = nil
+          track.id = updatedTrack.id
+          track.startTime = updatedTrack.startTime
+          track.endTime = updatedTrack.endTime
+          track.title = updatedTrack.title
+          do {
+            try modelContext.save()
+          } catch {}
+        }
+      }
     }
   }
 
@@ -197,7 +184,7 @@ struct SoundBoardView: View {
       Track(
         id: "QowrW0Qj1og",
         startTime: Optional(4.0),
-        endTime: Optional(24.0),
+        endTime: Optional(34.0),
         thumbnailURL: URL(string: "https://img.youtube.com/vi/QowrW0Qj1og/sddefault.jpg")!,
         title: "Sad Truth Revealed"
       ),
@@ -205,7 +192,7 @@ struct SoundBoardView: View {
       Track(
         id: "hRok6zPZKMA",
         startTime: Optional(242.0),
-        endTime: Optional(262.0),
+        endTime: Optional(272.0),
         thumbnailURL: URL(string: "https://img.youtube.com/vi/hRok6zPZKMA/sddefault.jpg")!,
         title: "Epic"
       ),
@@ -233,7 +220,7 @@ struct SoundBoardView: View {
     Track(
       id: "QowrW0Qj1og",
       startTime: Optional(4.0),
-      endTime: Optional(9.0),
+      endTime: Optional(34.0),
       thumbnailURL: URL(string: "https://img.youtube.com/vi/QowrW0Qj1og/sddefault.jpg")!,
       title: "Sad Truth Revealed"
     ),
@@ -241,7 +228,7 @@ struct SoundBoardView: View {
     Track(
       id: "hRok6zPZKMA",
       startTime: Optional(242.0),
-      endTime: Optional(262.0),
+      endTime: Optional(272.0),
       thumbnailURL: URL(string: "https://img.youtube.com/vi/hRok6zPZKMA/sddefault.jpg")!,
       title: "Epic"
     ),
@@ -257,14 +244,14 @@ struct SoundBoardView: View {
     Track(
       id: "Crb4PWglCvo",
       startTime: Optional(4.0),
-      endTime: Optional(9.0),
+      endTime: Optional(14.0),
       thumbnailURL: URL(string: "https://img.youtube.com/vi/Crb4PWglCvo/sddefault.jpg")!,
       title: "B"
     ),
   ]
 
   for track in tracks {
-    // container.mainContext.insert(track)
+    container.mainContext.insert(track)
   }
 
   return SoundBoardView()

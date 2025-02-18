@@ -11,8 +11,19 @@ class Track: Identifiable {
   var createdAt: Date = Date()
   var updatedAt: Date = Date()
 
+  var url: URL {
+    var url = URL(string: "https://youtu.be")!.appendingPathComponent(id)
+    if let startTime {
+      url.append(queryItems: [URLQueryItem(name: "t", value: "\(Int(startTime))")])
+    }
+    return url
+  }
+
   init(
-    id: String, startTime: Double? = nil, endTime: Double? = nil, thumbnailURL: URL? = nil,
+    id: String,
+    startTime: Double? = nil,
+    endTime: Double? = nil,
+    thumbnailURL: URL? = nil,
     title: String
   ) {
     self.id = id
